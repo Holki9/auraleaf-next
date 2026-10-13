@@ -229,4 +229,10 @@ public abstract class TextBookDocument implements ComicDocument {
 
         return bitmap;
     }
+
+    @Override
+    public void close() {
+        pages.clear();
+        chapters.clear();
+    }
 }
