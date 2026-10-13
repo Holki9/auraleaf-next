@@ -114,6 +114,14 @@ public class CoverExtractor {
         } else if (lower.endsWith(".fb2") || lower.endsWith(".fb2.zip")) {
             File tempFile = getFileFromUri(context, uri, "temp_cover.fb2");
             return extractFb2(tempFile, coverFile, fileName);
+        } else if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".webp")) {
+            File tempFile = getFileFromUri(context, uri, "temp_cover.png");
+            Bitmap bmp = BitmapFactory.decodeFile(tempFile.getAbsolutePath());
+            if (bmp != null) {
+                saveScaledBitmap(bmp, coverFile);
+                bmp.recycle();
+            }
+            return new ComicInfo(1, coverFile.getAbsolutePath());
         } else if (lower.endsWith(".txt")) {
             File tempFile = getFileFromUri(context, uri, "temp_cover.txt");
             TxtDocument doc = new TxtDocument(context, tempFile);

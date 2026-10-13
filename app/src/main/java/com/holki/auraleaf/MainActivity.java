@@ -275,162 +275,72 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showCreateGroupDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Новая папка");
-        final EditText input = new EditText(this);
-        input.setHint("Название папки (например: Блич, Романы)");
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(0xFF64748B);
-        int pad = dpToPx(16);
-        input.setPadding(pad, pad, pad, pad);
-        builder.setView(input);
-
-        builder.setPositiveButton("Создать", (dialog, which) -> {
-            String name = input.getText().toString().trim();
-            if (!name.isEmpty()) {
-                dbHelper.insertGroup(name);
-                loadItems();
-                Toast.makeText(this, "Папка «" + name + "» создана", Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        CyberDialogHelper.showInputDialog(this, "ORGANIZATION // CREATE", "НОВАЯ ПАПКА",
+                "", "Название папки (например: Блич, Романы)", "СОЗДАТЬ", name -> {
+                    dbHelper.insertGroup(name);
+                    loadItems();
+                });
     }
 
     private void showRenameGroupDialog(GroupItem group) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Переименовать папку");
-        final EditText input = new EditText(this);
-        input.setText(group.title);
-        input.setTextColor(Color.WHITE);
-        int pad = dpToPx(16);
-        input.setPadding(pad, pad, pad, pad);
-        builder.setView(input);
-
-        builder.setPositiveButton("Сохранить", (dialog, which) -> {
-            String name = input.getText().toString().trim();
-            if (!name.isEmpty()) {
-                dbHelper.renameGroup(group.id, name);
-                if (currentGroupId == group.id) {
-                    currentGroupTitle = name;
-                    tvFolderTitle.setText(name);
-                }
-                loadItems();
-            }
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        CyberDialogHelper.showInputDialog(this, "ORGANIZATION // RENAME", "ПЕРЕИМЕНОВАТЬ ПАПКУ",
+                group.title, "Новое название", "СОХРАНИТЬ", name -> {
+                    dbHelper.renameGroup(group.id, name);
+                    if (currentGroupId == group.id) {
+                        currentGroupTitle = name;
+                        tvFolderTitle.setText(name);
+                    }
+                    loadItems();
+                });
     }
 
     private void showDeleteGroupDialog(GroupItem group) {
-        String[] options = new String[]{
-                "Удалить только папку (книги останутся на полке)",
-                "Удалить папку и все книги внутри"
-        };
-
-        new AlertDialog.Builder(this)
-                .setTitle("Удалить папку «" + group.title + "»?")
-                .setItems(options, (dialog, which) -> {
-                    boolean deleteBooks = (which == 1);
-                    dbHelper.deleteGroup(group.id, deleteBooks);
-                    if (currentGroupId == group.id) {
-                        openRootShelf();
-                    } else {
-                        loadItems();
-                    }
-                    Toast.makeText(this, "Папка удалена", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+        CyberDialogHelper.showFolderDeleteOptions(this, group.title,
+                () -> {
+                    dbHelper.deleteGroup(group.id, false);
+                    if (currentGroupId == group.id) openRootShelf();
+                    else loadItems();
+                },
+                () -> {
+                    dbHelper.deleteGroup(group.id, true);
+                    if (currentGroupId == group.id) openRootShelf();
+                    else loadItems();
+                });
     }
 
     private void showMoveBookDialog(BookItem book) {
         List<GroupItem> groups = dbHelper.getGroups();
-        List<String> titles = new ArrayList<>();
-        List<Long> groupIds = new ArrayList<>();
-
-        titles.add("📁 Главная полка (Без папки)");
-        groupIds.add(0L);
-
-        for (GroupItem g : groups) {
-            titles.add("📁 " + g.title);
-            groupIds.add(g.id);
-        }
-
-        titles.add("➕ Создать новую папку...");
-        groupIds.add(-1L);
-
-        new AlertDialog.Builder(this)
-                .setTitle("Переместить «" + book.title + "»")
-                .setItems(titles.toArray(new String[0]), (dialog, which) -> {
-                    long selectedGroupId = groupIds.get(which);
-                    if (selectedGroupId == -1L) {
-                        // Create new group and move book to it
-                        showCreateGroupAndMove(book);
-                    } else {
-                        dbHelper.setBookGroup(book.id, selectedGroupId);
-                        loadItems();
-                        Toast.makeText(this, "Перемещено", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+        CyberDialogHelper.showMoveToFolderDialog(this, book, groups,
+                selectedGroupId -> {
+                    dbHelper.setBookGroup(book.id, selectedGroupId);
+                    loadItems();
+                },
+                () -> showCreateGroupAndMove(book));
     }
 
     private void showCreateGroupAndMove(BookItem book) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Создать папку и переместить");
-        final EditText input = new EditText(this);
-        input.setHint("Название папки");
-        input.setTextColor(Color.WHITE);
-        int pad = dpToPx(16);
-        input.setPadding(pad, pad, pad, pad);
-        builder.setView(input);
-
-        builder.setPositiveButton("Создать", (dialog, which) -> {
-            String name = input.getText().toString().trim();
-            if (!name.isEmpty()) {
-                long newGid = dbHelper.insertGroup(name);
-                dbHelper.setBookGroup(book.id, newGid);
-                loadItems();
-                Toast.makeText(this, "Перемещено в «" + name + "»", Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        CyberDialogHelper.showInputDialog(this, "ORGANIZATION // CREATE & ROUTE", "НОВАЯ ПАПКА",
+                "", "Название папки", "СОЗДАТЬ И ПЕРЕМЕСТИТЬ", name -> {
+                    long newGid = dbHelper.insertGroup(name);
+                    dbHelper.setBookGroup(book.id, newGid);
+                    loadItems();
+                });
     }
 
     private void showRenameBookDialog(BookItem book) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Переименовать");
-        final EditText input = new EditText(this);
-        input.setText(book.title);
-        input.setTextColor(Color.WHITE);
-        int pad = dpToPx(16);
-        input.setPadding(pad, pad, pad, pad);
-        builder.setView(input);
-
-        builder.setPositiveButton("Сохранить", (dialog, which) -> {
-            String newTitle = input.getText().toString().trim();
-            if (!newTitle.isEmpty()) {
-                dbHelper.renameBook(book.id, newTitle);
-                loadItems();
-            }
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        CyberDialogHelper.showInputDialog(this, "LIBRARY // RENAME", "ПЕРЕИМЕНОВАТЬ КНИГУ",
+                book.title, "Новое название", "СОХРАНИТЬ", newTitle -> {
+                    dbHelper.renameBook(book.id, newTitle);
+                    loadItems();
+                });
     }
 
     private void showDeleteBookDialog(BookItem book) {
-        new AlertDialog.Builder(this)
-                .setTitle("Удалить книгу?")
-                .setMessage("«" + book.title + "» будет удалена с полки.")
-                .setPositiveButton("Удалить", (dialog, which) -> {
+        CyberDialogHelper.showConfirmDialog(this, "LIBRARY // REMOVE", "УДАЛИТЬ С ПОЛКИ",
+                "Файл «" + book.title + "» будет удален из библиотеки устройства.", "УДАЛИТЬ", () -> {
                     dbHelper.deleteBook(book.id);
                     loadItems();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+                });
     }
 
     private void initPicker() {
@@ -462,6 +372,9 @@ public class MainActivity extends AppCompatActivity {
                 "application/x-fictionbook",
                 "application/x-fb2",
                 "text/plain",
+                "image/png",
+                "image/jpeg",
+                "image/webp",
                 "application/zip",
                 "*/*"
         });

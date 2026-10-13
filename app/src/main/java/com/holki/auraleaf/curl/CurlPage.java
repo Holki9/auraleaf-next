@@ -90,11 +90,12 @@ public class CurlPage {
 		int newW = Math.max(2, getNextHighestPO2(w));
 		int newH = Math.max(2, getNextHighestPO2(h));
 
-		Bitmap.Config config = bitmap.getConfig() != null ? bitmap.getConfig() : Bitmap.Config.RGB_565;
+		Bitmap.Config config = Bitmap.Config.ARGB_8888;
 		Bitmap bitmapTex = Bitmap.createBitmap(newW, newH, config);
 		Canvas c = new Canvas(bitmapTex);
 		c.drawColor(Color.WHITE);
-		c.drawBitmap(bitmap, 0, 0, null);
+		Paint p = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+		c.drawBitmap(bitmap, 0, 0, p);
 
 		float texX = (float) w / newW;
 		float texY = (float) h / newH;

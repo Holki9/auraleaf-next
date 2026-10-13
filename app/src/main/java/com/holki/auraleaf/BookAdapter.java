@@ -202,7 +202,7 @@ public class BookAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
             btnMore.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(ctx, btnMore);
-                popup.getMenu().add(0, 1, 0, "📁 Переместить в папку...");
+                popup.getMenu().add(0, 1, 0, "Переместить в папку");
                 popup.getMenu().add(0, 2, 1, "Переименовать");
                 popup.getMenu().add(0, 3, 2, "Удалить");
                 popup.setOnMenuItemClickListener(item -> {

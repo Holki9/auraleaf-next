@@ -74,6 +74,10 @@ public class PdfManager {
         } else if (lowerName.endsWith(".txt") || uriStr.endsWith(".txt") || pathStr.endsWith(".txt")) {
             File txtFile = CoverExtractor.getFileFromUri(context, uri, "active.txt");
             document = new TxtDocument(context, txtFile);
+        } else if (lowerName.endsWith(".png") || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".webp")
+                || uriStr.endsWith(".png") || uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") || uriStr.endsWith(".webp")) {
+            File imgFile = CoverExtractor.getFileFromUri(context, uri, "active_image.png");
+            document = new ImageDocument(imgFile);
         } else if (lowerName.endsWith(".cbz") || lowerName.endsWith(".zip") || uriStr.endsWith(".cbz") || uriStr.endsWith(".zip") || pathStr.endsWith(".cbz") || pathStr.endsWith(".zip")) {
             File cbzFile = CoverExtractor.getFileFromUri(context, uri, "active.cbz");
             document = new CbzDocument(cbzFile);
@@ -167,27 +171,36 @@ public class PdfManager {
             int drawW = pageBmp.getWidth();
             int drawH = pageBmp.getHeight();
 
+            // Calculate precise destination rect on screen preserving exact aspect ratio
+            float aspect = (float) drawW / drawH;
+            float targetAspect = (float) targetW / targetH;
+            int finalW, finalH;
+            if (aspect > targetAspect) {
+                finalW = targetW;
+                finalH = Math.max(10, Math.round(targetW / aspect));
+            } else {
+                finalH = targetH;
+                finalW = Math.max(10, Math.round(targetH * aspect));
+            }
+
+            int left = (targetW - finalW) / 2;
+            int top = (targetH - finalH) / 2;
+            Rect dstPageRect = new Rect(left, top, left + finalW, top + finalH);
+
             // Create full-screen bitmap for authentic edge-to-edge reading
             Bitmap fullBmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888);
             Canvas fullCanvas = new Canvas(fullBmp);
 
-            int left = (targetW - drawW) / 2;
-            int top = (targetH - drawH) / 2;
-
-            if (drawW < targetW || drawH < targetH) {
+            if (finalW < targetW || finalH < targetH) {
                 if (blurLevel <= 0) {
                     // Pure dark background
-                    fullCanvas.drawColor(0xFF0A0C10);
+                    fullCanvas.drawColor(0xFF07090E);
                 } else {
                     // Center-crop page area matching target screen aspect ratio with zoom.
-                    // Zooming in (1.28x) ensures the background artwork is larger ("больше"),
-                    // expanding rich artwork to all screen edges while pushing paper margins completely outside.
                     float bgZoom = 1.28f;
-                    float srcAspect = (float) drawW / drawH;
-                    float targetAspect = (float) targetW / targetH;
                     int baseCropW = drawW;
                     int baseCropH = drawH;
-                    if (srcAspect > targetAspect) {
+                    if (aspect > targetAspect) {
                         baseCropW = Math.round(drawH * targetAspect);
                     } else {
                         baseCropH = Math.round(drawW / targetAspect);
@@ -199,53 +212,31 @@ public class PdfManager {
                     cropW = Math.min(cropW, drawW - cropX);
                     cropH = Math.min(cropH, drawH - cropY);
 
-                    // Configure resolution and blur params based on blurLevel (1..100)
-                    int thumbW;
-                    int radius;
+                    int thumbW = 360;
+                    int radius = 2;
                     int passes = 1;
-                    float bright;
-                    float satBoost;
+                    float bright = 0.84f;
+                    float satBoost = 1.05f;
 
-                    if (blurLevel <= 15) { // Ultra-light (almost pure artwork bokeh)
-                        thumbW = 420;
-                        radius = 1;
-                        bright = 0.86f;
-                        satBoost = 1.02f;
-                    } else if (blurLevel <= 35) { // Light blur (user favorite default!)
-                        thumbW = 360;
-                        radius = 2;
-                        bright = 0.84f;
-                        satBoost = 1.05f;
-                    } else if (blurLevel <= 65) { // Medium blur
-                        thumbW = 300;
-                        radius = 4;
-                        bright = 0.82f;
-                        satBoost = 1.10f;
-                    } else if (blurLevel <= 85) { // Cinematic blur
-                        thumbW = 220;
-                        radius = 7;
-                        bright = 0.80f;
-                        satBoost = 1.15f;
-                    } else { // Heavy/abstract blur
-                        thumbW = 140;
-                        radius = 9;
-                        passes = 2;
-                        bright = 0.78f;
-                        satBoost = 1.25f;
+                    if (blurLevel <= 15) {
+                        thumbW = 420; radius = 1; bright = 0.86f; satBoost = 1.02f;
+                    } else if (blurLevel <= 35) {
+                        thumbW = 360; radius = 2; bright = 0.84f; satBoost = 1.05f;
+                    } else if (blurLevel <= 65) {
+                        thumbW = 300; radius = 4; bright = 0.82f; satBoost = 1.10f;
+                    } else if (blurLevel <= 85) {
+                        thumbW = 220; radius = 7; bright = 0.80f; satBoost = 1.15f;
+                    } else {
+                        thumbW = 140; radius = 9; passes = 2; bright = 0.78f; satBoost = 1.25f;
                     }
 
                     int thumbH = Math.max(10, Math.round((float) thumbW * targetH / targetW));
-
                     Bitmap croppedSrc = Bitmap.createBitmap(pageBmp, cropX, cropY, cropW, cropH);
                     Bitmap thumb = Bitmap.createScaledBitmap(croppedSrc, thumbW, thumbH, true);
-                    if (croppedSrc != thumb && !croppedSrc.isRecycled()) {
-                        croppedSrc.recycle();
-                    }
+                    if (croppedSrc != thumb && !croppedSrc.isRecycled()) croppedSrc.recycle();
 
                     Bitmap blurredThumb = blurAndDimThumbnail(thumb, radius, passes, bright, satBoost);
-                    if (thumb != blurredThumb && !thumb.isRecycled()) {
-                        thumb.recycle();
-                    }
+                    if (thumb != blurredThumb && !thumb.isRecycled()) thumb.recycle();
 
                     if (blurredThumb != null) {
                         Rect srcRect = new Rect(0, 0, blurredThumb.getWidth(), blurredThumb.getHeight());
@@ -255,39 +246,11 @@ public class PdfManager {
                         blurredThumb.recycle();
                     }
                 }
-
-                // Feather pageBmp borders (44px) so they dissolve seamlessly into backdrop
-                int feather = 44;
-                Paint fadePaint = new Paint();
-                fadePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
-                Canvas pageC = new Canvas(pageBmp);
-
-                if (top > 0) {
-                    fadePaint.setShader(new LinearGradient(
-                            0, 0, 0, feather,
-                            0xFF000000, 0x00000000, Shader.TileMode.CLAMP));
-                    pageC.drawRect(0, 0, drawW, feather, fadePaint);
-
-                    fadePaint.setShader(new LinearGradient(
-                            0, drawH - feather, 0, drawH,
-                            0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
-                    pageC.drawRect(0, drawH - feather, drawW, drawH, fadePaint);
-                }
-
-                if (left > 0) {
-                    fadePaint.setShader(new LinearGradient(
-                            0, 0, feather, 0,
-                            0xFF000000, 0x00000000, Shader.TileMode.CLAMP));
-                    pageC.drawRect(0, 0, feather, drawH, fadePaint);
-
-                    fadePaint.setShader(new LinearGradient(
-                            drawW - feather, 0, drawW, 0,
-                            0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
-                    pageC.drawRect(drawW - feather, 0, drawW, drawH, fadePaint);
-                }
             }
 
-            fullCanvas.drawBitmap(pageBmp, left, top, null);
+            // Draw comic page with maximum bilinear / bicubic filtering — zero erosion or blurring of the artwork
+            Paint pagePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+            fullCanvas.drawBitmap(pageBmp, null, dstPageRect, pagePaint);
             pageBmp.recycle();
 
             memoryCache.put(cacheKey, fullBmp);

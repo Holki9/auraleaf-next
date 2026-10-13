@@ -410,27 +410,15 @@ public class ReaderActivity extends AppCompatActivity {
 
     private void showThemePicker() {
         ThemeManager.ReaderTheme current = ThemeManager.getCurrentTheme(this);
-        String[] items = new String[]{
-                "☀️ Студия (Дневной / Оригинальный)",
-                "📜 Пергамент (Теплая сепия)",
-                "🌙 Полночь (Глубокий OLED)",
-                "🌲 Хвоя (Успокаивающий ночной)"
-        };
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Режим чтения")
-                .setSingleChoiceItems(items, current.id, (dialog, which) -> {
-                    ThemeManager.setCurrentTheme(this, which);
-                    applyTheme();
-                    if (pdfManager != null) {
-                        pdfManager.clearCache();
-                    }
-                    curlView.setCurrentIndex(curlView.getCurrentIndex());
-                    updateAmbientGlow(curlView.getCurrentIndex());
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Закрыть", null)
-                .show();
+        CyberDialogHelper.showThemeSelector(this, current.id, which -> {
+            ThemeManager.setCurrentTheme(this, which);
+            applyTheme();
+            if (pdfManager != null) {
+                pdfManager.clearCache();
+            }
+            curlView.setCurrentIndex(curlView.getCurrentIndex());
+            updateAmbientGlow(curlView.getCurrentIndex());
+        });
     }
 
     private void applyTheme() {

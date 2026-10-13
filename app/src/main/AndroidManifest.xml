@@ -47,6 +47,9 @@
                 <data android:mimeType="application/x-fictionbook" />
                 <data android:mimeType="application/x-fb2" />
                 <data android:mimeType="text/plain" />
+                <data android:mimeType="image/png" />
+                <data android:mimeType="image/jpeg" />
+                <data android:mimeType="image/webp" />
                 <data android:scheme="content" />
                 <data android:scheme="file" />
             </intent-filter>
@@ -63,6 +66,10 @@
                 <data android:pathPattern=".*\\.epub" />
                 <data android:pathPattern=".*\\.fb2" />
                 <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.png" />
+                <data android:pathPattern=".*\\.jpg" />
+                <data android:pathPattern=".*\\.jpeg" />
+                <data android:pathPattern=".*\\.webp" />
             </intent-filter>
         </activity>
 
