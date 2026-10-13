@@ -505,7 +505,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 
 		mPointerPos.mPos.set(me.getX(), me.getY());
 		mRenderer.translate(mPointerPos.mPos);
-		mPointerPos.mPressure = mEnableTouchPressure ? me.getPressure() : 0.0f;
+		mPointerPos.mPressure = mEnableTouchPressure ? me.getPressure() : 0.8f;
 
 		switch (me.getAction() & MotionEvent.ACTION_MASK) {
 		case MotionEvent.ACTION_DOWN: {
@@ -557,23 +557,12 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 					return true;
 				}
 
-				PointF startPoint = new PointF(mDownScreenX, mDownScreenY);
-				mRenderer.translate(startPoint);
-
 				if (dx < 0) {
 					// Swiping left -> Turn NEXT page forward!
 					if (mCurrentIndex < mPageProvider.getPageCount() - 1) {
 						mDragStartPos.set(mPointerPos.mPos);
 						mDragStartPos.x = rightRect.right;
-						float topThresh = rightRect.top - rightRect.height() * 0.30f;
-						float bottomThresh = rightRect.bottom + rightRect.height() * 0.30f;
-						if (startPoint.y > topThresh) {
-							mDragStartPos.y = rightRect.top;
-						} else if (startPoint.y < bottomThresh) {
-							mDragStartPos.y = rightRect.bottom;
-						} else {
-							mDragStartPos.y = startPoint.y;
-						}
+						mDragStartPos.y = mPointerPos.mPos.y;
 						startCurl(CURL_RIGHT);
 					} else {
 						return true;
@@ -583,15 +572,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 					if (mCurrentIndex > 0) {
 						mDragStartPos.set(mPointerPos.mPos);
 						mDragStartPos.x = rightRect.left;
-						float topThresh = rightRect.top - rightRect.height() * 0.30f;
-						float bottomThresh = rightRect.bottom + rightRect.height() * 0.30f;
-						if (startPoint.y > topThresh) {
-							mDragStartPos.y = rightRect.top;
-						} else if (startPoint.y < bottomThresh) {
-							mDragStartPos.y = rightRect.bottom;
-						} else {
-							mDragStartPos.y = startPoint.y;
-						}
+						mDragStartPos.y = mPointerPos.mPos.y;
 						startCurl(CURL_LEFT);
 					} else {
 						return true;
@@ -953,16 +934,23 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 	 */
 	private void updateCurlPos(PointerPosition pointerPos) {
 
-		// Base curl radius proportional to page width for supple, organic page curling
-		float pageWidth = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).width();
-		double radius = pageWidth * 0.24; // Pliable, natural book page radius
-
-		if (mEnableTouchPressure && pointerPos.mPressure > 0f) {
-			radius *= Math.max(1f - (pointerPos.mPressure * 0.25f), 0.6f);
-		}
-
+		// Default curl radius.
+		double radius = mRenderer.getPageRect(CURL_RIGHT).width() / 3;
+		// TODO: This is not an optimal solution. Based on feedback received so
+		// far; pressure is not very accurate, it may be better not to map
+		// coefficient to range [0f, 1f] but something like [.2f, 1f] instead.
+		// Leaving it as is until get my hands on a real device. On emulator
+		// this doesn't work anyway.
+		radius *= Math.max(1f - pointerPos.mPressure, 0f);
+		// NOTE: Here we set pointerPos to mCurlPos. It might be a bit confusing
+		// later to see e.g "mCurlPos.x - mDragStartPos.x" used. But it's
+		// actually pointerPos we are doing calculations against. Why? Simply to
+		// optimize code a bit with the cost of making it unreadable. Otherwise
+		// we had to this in both of the next if-else branches.
 		mCurlPos.set(pointerPos.mPos);
 
+		// If curl happens on right page, or on left page on two page mode,
+		// we'll calculate curl position from pointerPos.
 		if (mCurlState == CURL_RIGHT
 				|| (mCurlState == CURL_LEFT && mViewMode == SHOW_TWO_PAGES)) {
 
@@ -971,16 +959,27 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 			float dist = (float) Math.sqrt(mCurlDir.x * mCurlDir.x + mCurlDir.y
 					* mCurlDir.y);
 
+			// Adjust curl radius so that if page is dragged far enough on
+			// opposite side, radius gets closer to zero.
+			float pageWidth = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT)
+					.width();
 			double curlLen = radius * Math.PI;
 			if (dist > (pageWidth * 2) - curlLen) {
-				curlLen = Math.max((pageWidth * 2) - dist, 0.01f);
+				curlLen = Math.max((pageWidth * 2) - dist, 0f);
 				radius = curlLen / Math.PI;
 			}
 
-			// Actual curl position calculation — symmetrical in both axes!
+			// Actual curl position calculation.
 			if (dist >= curlLen) {
 				double translate = (dist - curlLen) / 2;
-				mCurlPos.x -= mCurlDir.x * translate / dist;
+				if (mViewMode == SHOW_TWO_PAGES) {
+					mCurlPos.x -= mCurlDir.x * translate / dist;
+				} else {
+					float pageLeftX = mRenderer
+							.getPageRect(CurlRenderer.PAGE_RIGHT).left;
+					radius = Math.max(Math.min(mCurlPos.x - pageLeftX, radius),
+							0f);
+				}
 				mCurlPos.y -= mCurlDir.y * translate / dist;
 			} else {
 				double angle = Math.PI * Math.sqrt(dist / curlLen);
@@ -989,28 +988,17 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 				mCurlPos.y += mCurlDir.y * translate / dist;
 			}
 		}
+		// Otherwise we'll let curl follow pointer position.
 		else if (mCurlState == CURL_LEFT) {
-			mCurlDir.x = mCurlPos.x - mDragStartPos.x;
+
+			// Adjust radius regarding how close to page edge we are.
+			float pageLeftX = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).left;
+			radius = Math.max(Math.min(mCurlPos.x - pageLeftX, radius), 0f);
+
+			float pageRightX = mRenderer.getPageRect(CurlRenderer.PAGE_RIGHT).right;
+			mCurlPos.x -= Math.min(pageRightX - mCurlPos.x, radius);
+			mCurlDir.x = mCurlPos.x + mDragStartPos.x;
 			mCurlDir.y = mCurlPos.y - mDragStartPos.y;
-			float dist = (float) Math.sqrt(mCurlDir.x * mCurlDir.x + mCurlDir.y
-					* mCurlDir.y);
-
-			double curlLen = radius * Math.PI;
-			if (dist > (pageWidth * 2) - curlLen) {
-				curlLen = Math.max((pageWidth * 2) - dist, 0.01f);
-				radius = curlLen / Math.PI;
-			}
-
-			if (dist >= curlLen) {
-				double translate = (dist - curlLen) / 2;
-				mCurlPos.x -= mCurlDir.x * translate / dist;
-				mCurlPos.y -= mCurlDir.y * translate / dist;
-			} else {
-				double angle = Math.PI * Math.sqrt(dist / curlLen);
-				double translate = radius * Math.sin(angle);
-				mCurlPos.x += mCurlDir.x * translate / dist;
-				mCurlPos.y += mCurlDir.y * translate / dist;
-			}
 		}
 
 		setCurlPos(mCurlPos, mCurlDir, radius);
