@@ -385,6 +385,8 @@ public class PdfManager {
                 mainHandler.post(() -> callback.onPageRendered(index, bmp));
             }
         });
+    }
+
     public void preloadPages(int currentIndex, int targetW, int targetH) {
         if (document == null || renderExecutor == null || renderExecutor.isShutdown() || targetW <= 0 || targetH <= 0) return;
         int count = pageCount;
