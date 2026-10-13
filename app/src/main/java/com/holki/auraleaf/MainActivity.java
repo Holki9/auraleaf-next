@@ -30,6 +30,9 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -389,14 +392,42 @@ public class MainActivity extends AppCompatActivity {
                 String displayName = getFileName(uri);
                 String title = displayName != null ? displayName.replaceFirst("[.][^.]+$", "") : "Книга";
 
-                // Universal cover and page extraction (PDF, CBZ, CBR, EPUB, FB2, TXT)
-                CoverExtractor.ComicInfo info = CoverExtractor.extract(this, uri, displayName);
+                // Automatically copy file into private app storage
+                // so unplugging USB or deleting source file never breaks access!
+                Uri targetUri = uri;
+                try {
+                    File booksDir = new File(getFilesDir(), "books");
+                    if (!booksDir.exists()) booksDir.mkdirs();
 
-                long bookId = dbHelper.insertBook(title, uri.toString(), info.totalPages, 0, info.coverPath, targetGroupId);
+                    String safeName = (displayName != null) ? displayName : ("doc_" + System.currentTimeMillis() + ".pdf");
+                    File localFile = new File(booksDir, System.currentTimeMillis() + "_" + safeName);
+
+                    try (InputStream in = getContentResolver().openInputStream(uri);
+                         FileOutputStream out = new FileOutputStream(localFile)) {
+                        if (in != null) {
+                            byte[] buffer = new byte[65536];
+                            int read;
+                            while ((read = in.read(buffer)) != -1) {
+                                out.write(buffer, 0, read);
+                            }
+                            targetUri = Uri.fromFile(localFile);
+                        }
+                    }
+                } catch (Exception copyErr) {
+                    copyErr.printStackTrace();
+                    // Fall back to original uri if local copy fails
+                }
+
+                final Uri finalUri = targetUri;
+
+                // Universal cover and page extraction (PDF, CBZ, CBR, EPUB, FB2, TXT)
+                CoverExtractor.ComicInfo info = CoverExtractor.extract(this, finalUri, displayName);
+
+                long bookId = dbHelper.insertBook(title, finalUri.toString(), info.totalPages, 0, info.coverPath, targetGroupId);
 
                 runOnUiThread(() -> {
                     loadItems();
-                    BookItem newBook = new BookItem(bookId, title, uri.toString(), info.totalPages, 0, info.coverPath, System.currentTimeMillis(), targetGroupId);
+                    BookItem newBook = new BookItem(bookId, title, finalUri.toString(), info.totalPages, 0, info.coverPath, System.currentTimeMillis(), targetGroupId);
                     openReader(newBook);
                 });
 

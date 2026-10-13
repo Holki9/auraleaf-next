@@ -30,20 +30,11 @@ public class PdfDocument implements ComicDocument {
             float pageW = page.getWidth();
             float pageH = page.getHeight();
 
-            // Supersample at 1.5x of target resolution using RENDER_MODE_FOR_PRINT
+            // Render at exact native display resolution with RENDER_MODE_FOR_PRINT
             // for razor-sharp vector line art, crisp text, and lossless image quality
-            float baseScale = Math.min((float) maxW / pageW, (float) maxH / pageH);
-            float scale = Math.max(1.0f, baseScale * 1.5f);
-
+            float scale = Math.min((float) maxW / pageW, (float) maxH / pageH);
             int drawW = Math.max(10, Math.round(pageW * scale));
             int drawH = Math.max(10, Math.round(pageH * scale));
-
-            // Cap at 3840px max dimension to prevent out-of-memory while retaining 4K sharpness
-            if (drawW > 3840 || drawH > 3840) {
-                float cap = 3840f / Math.max(drawW, drawH);
-                drawW = Math.round(drawW * cap);
-                drawH = Math.round(drawH * cap);
-            }
 
             Bitmap bmp = Bitmap.createBitmap(drawW, drawH, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bmp);

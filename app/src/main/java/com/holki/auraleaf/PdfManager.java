@@ -385,6 +385,27 @@ public class PdfManager {
                 mainHandler.post(() -> callback.onPageRendered(index, bmp));
             }
         });
+    public void preloadPages(int currentIndex, int targetW, int targetH) {
+        if (document == null || renderExecutor == null || renderExecutor.isShutdown() || targetW <= 0 || targetH <= 0) return;
+        int count = pageCount;
+        if (currentIndex + 1 < count) {
+            String key = (currentIndex + 1) + "@" + targetW + "x" + targetH;
+            if (memoryCache.get(key) == null) {
+                renderExecutor.execute(() -> getPageSync(currentIndex + 1, targetW, targetH));
+            }
+        }
+        if (currentIndex - 1 >= 0) {
+            String key = (currentIndex - 1) + "@" + targetW + "x" + targetH;
+            if (memoryCache.get(key) == null) {
+                renderExecutor.execute(() -> getPageSync(currentIndex - 1, targetW, targetH));
+            }
+        }
+        if (currentIndex + 2 < count) {
+            String key = (currentIndex + 2) + "@" + targetW + "x" + targetH;
+            if (memoryCache.get(key) == null) {
+                renderExecutor.execute(() -> getPageSync(currentIndex + 2, targetW, targetH));
+            }
+        }
     }
 
     public void close() {

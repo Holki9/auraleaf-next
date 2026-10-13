@@ -195,6 +195,11 @@ public class ReaderActivity extends AppCompatActivity {
                     updatePageUI(newPageIndex);
                     dbHelper.updateProgress(bookId, newPageIndex);
                     updateAmbientGlow(newPageIndex);
+                    curlView.post(() -> {
+                        if (pdfManager != null && curlView != null) {
+                            pdfManager.preloadPages(newPageIndex, curlView.getWidth(), curlView.getHeight());
+                        }
+                    });
                 }
             });
 
@@ -217,6 +222,11 @@ public class ReaderActivity extends AppCompatActivity {
 
             updatePageUI(startPage);
             updateAmbientGlow(startPage);
+            curlView.post(() -> {
+                if (pdfManager != null && curlView != null) {
+                    pdfManager.preloadPages(startPage, curlView.getWidth(), curlView.getHeight());
+                }
+            });
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Не удалось открыть PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
